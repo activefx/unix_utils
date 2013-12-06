@@ -10,25 +10,36 @@ module UnixUtils
 
   BUFSIZE = 2**16
 
+  module Error; end
+
+  def self.tag_errors
+    yield
+  rescue Exception => error
+    error.extend(UnixUtils::Error)
+    raise error, "[unix_utils] " + error.message
+  end
+
   def self.curl(url, form_data = nil)
-    outfile = tmp_path url
-    if url.start_with?('file://') or not url.include?('://')
-      # deal with local files
-      infile = File.expand_path url.sub('file://', '')
-      unless File.readable?(infile)
-        raise "[unix_utils] #{url.inspect} does not exist or is not readable on the local filesystem."
+    tag_errors do
+      outfile = tmp_path url
+      if url.start_with?('file://') or not url.include?('://')
+        # deal with local files
+        infile = File.expand_path url.sub('file://', '')
+        unless File.readable?(infile)
+          raise "#{url.inspect} does not exist or is not readable on the local filesystem."
+        end
+        FileUtils.cp infile, outfile
+        return outfile
       end
-      FileUtils.cp infile, outfile
-      return outfile
+      uri = URI.parse url
+      argv = [ 'curl', '--location', '--show-error', '--silent', '--compressed', '--header', 'Expect: ' ]
+      if form_data
+        argv += [ '--data', form_data ]
+      end
+      argv += [ uri.to_s, '--output', outfile ]
+      spawn argv
+      outfile
     end
-    uri = URI.parse url
-    argv = [ 'curl', '--location', '--show-error', '--silent', '--compressed', '--header', 'Expect: ' ]
-    if form_data
-      argv += [ '--data', form_data ]
-    end
-    argv += [ uri.to_s, '--output', outfile ]
-    spawn argv
-    outfile
   end
 
   #--
@@ -294,49 +305,53 @@ module UnixUtils
   def self._spawn(argv, input, output, error)
     # lifted from posix-spawn
     # https://github.com/rtomayko/posix-spawn/blob/master/lib/posix/spawn/child.rb
-    Open3.popen3(*argv) do |stdin, stdout, stderr|
-      readers = [stdout, stderr]
-      if RUBY_DESCRIPTION =~ /jruby 1.7.0/
-        readers.delete stderr
-      end
-      writers = if input
-        [stdin]
-      else
-        stdin.close
-        []
-      end
-      while readers.any? or writers.any?
-        ready = IO.select(readers, writers, readers + writers)
-        # write to stdin stream
-        ready[1].each do |fd|
-          begin
-            boom = nil
-            size = fd.write input.read(BUFSIZE)
-          rescue Errno::EPIPE => boom
-          rescue Errno::EAGAIN, Errno::EINTR
-          end
-          if boom || size < BUFSIZE
-            stdin.close
-            input.close
-            writers.delete stdin
-          end
+    Open3.popen3(*argv) do |stdin, stdout, stderr, thread|
+      if thread.value.success?
+        readers = [stdout, stderr]
+        if RUBY_DESCRIPTION =~ /jruby 1.7.0/
+          readers.delete stderr
         end
-        # read from stdout and stderr streams
-        ready[0].each do |fd|
-          buf = (fd == stdout) ? output : error
-          if fd.eof?
-            readers.delete fd
-            fd.close
-          else
+        writers = if input
+          [stdin]
+        else
+          stdin.close
+          []
+        end
+        while readers.any? or writers.any?
+          ready = IO.select(readers, writers, readers + writers)
+          # write to stdin stream
+          ready[1].each do |fd|
             begin
-              # buf << fd.gets(BUFSIZE) # maybe?
-              buf << fd.readpartial(BUFSIZE)
+              boom = nil
+              size = fd.write input.read(BUFSIZE)
+            rescue Errno::EPIPE => boom
             rescue Errno::EAGAIN, Errno::EINTR
+            end
+            if boom || size < BUFSIZE
+              stdin.close
+              input.close
+              writers.delete stdin
+            end
+          end
+          # read from stdout and stderr streams
+          ready[0].each do |fd|
+            buf = (fd == stdout) ? output : error
+            if fd.eof?
+              readers.delete fd
+              fd.close
+            else
+              begin
+                # buf << fd.gets(BUFSIZE) # maybe?
+                buf << fd.readpartial(BUFSIZE)
+              rescue Errno::EAGAIN, Errno::EINTR
+              end
             end
           end
         end
+        # thanks @tmm1 and @rtomayko for showing how it's done!
+      else
+        raise stderr.read
       end
-      # thanks @tmm1 and @rtomayko for showing how it's done!
     end
   end
 
