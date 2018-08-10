@@ -1,10 +1,11 @@
+require 'unix_utils/version'
+
 require 'fileutils'
 require 'tmpdir'
 require 'uri'
 require 'stringio'
 require 'open3'
 require 'securerandom'
-require "unix_utils/version"
 
 module UnixUtils
 

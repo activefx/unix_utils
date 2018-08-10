@@ -1,15 +1,20 @@
-#!/usr/bin/env rake
+# frozen_string_literal: true
+
 require "bundler/gem_tasks"
+require "rspec/core/rake_task"
 
-require 'rake'
-require 'rake/testtask'
-Rake::TestTask.new(:test) do |test|
-  test.libs << 'lib' << 'test'
-  test.pattern = 'test/**/test_*.rb'
-  test.verbose = true
+require "unix_utils/version"
+
+RSpec::Core::RakeTask.new(:spec)
+
+task :default => :spec
+
+desc "Load development console"
+task :console do
+  require 'irb'
+  require 'irb/completion'
+  require 'unix_utils'
+  Dir["#{File.dirname(__FILE__)}/examples/**/*.rb"].each { |f| load(f) }
+  ARGV.clear
+  IRB.start
 end
-
-task :default => :test
-
-require 'yard'
-YARD::Rake::YardocTask.new

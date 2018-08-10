@@ -1,26 +1,28 @@
-# -*- encoding: utf-8 -*-
-require File.expand_path('../lib/unix_utils/version', __FILE__)
+# frozen_string_literal: true
 
-Gem::Specification.new do |gem|
-  gem.authors       = ["Seamus Abshere"]
-  gem.email         = ["seamus@abshere.net"]
+$LOAD_PATH.unshift(File.join(File.dirname(__FILE__), "lib"))
+
+require "unix_utils/version"
+
+Gem::Specification.new do |s|
+  s.name          = "unix_utils"
+  s.version       = UnixUtils::VERSION
   desc = %q{Like FileUtils, but provides zip, unzip, bzip2, bunzip2, tar, untar, sed, du, md5sum, shasum, cut, head, tail, wc, unix2dos, dos2unix, iconv, curl, perl, etc.}
-  gem.description   = desc
-  gem.summary       = desc
-  gem.homepage      = "https://github.com/seamusabshere/unix_utils"
+  s.summary       = desc
+  s.description   = desc
+  s.author        = ["Seamus Abshere"]
+  s.email         = ["seamus@abshere.net"]
+  s.homepage      = "https://github.com/seamusabshere/unix_utils"
+  s.license       = "MIT"
 
-  gem.executables   = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
-  gem.files         = `git ls-files`.split("\n")
-  gem.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
-  gem.name          = "unix_utils"
-  gem.require_paths = ["lib"]
-  gem.version       = UnixUtils::VERSION
-  gem.license       = 'MIT'
+  s.files         = `git ls-files`.split("\n")
+  s.test_files    = `git ls-files -- test/*`.split("\n")
+  s.executables   = `git ls-files -- bin/*`.split("\n").map { |f| File.basename(f) }
+  s.require_paths = ["lib"]
 
-  gem.add_development_dependency 'minitest'
-  if RUBY_VERSION >= '1.9'
-    gem.add_development_dependency 'minitest-reporters'
-  end
-  gem.add_development_dependency 'yard'
-  gem.add_development_dependency 'pry'
+  s.required_ruby_version = ">= 2.0.0"
+
+  s.add_development_dependency "bundler",           "~> 1.15"
+  s.add_development_dependency "rake",              ">= 10.0"
+  s.add_development_dependency "rspec",             "~> 3.7"
 end
